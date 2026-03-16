@@ -1,0 +1,19 @@
+WITHIN PRIMITIVE
+
+Purpose:
+Declare movement within small local nodes.
+
+Core Rules:
+1. No accounts.
+2. No discovery.
+3. No global feed.
+4. Nodes are invite-only.
+5. Losing devise = lose access until reinvited.
+6. Reset wipes local device data only.
+7. Coordination happens off-app.
+8. Signals are temporary.
+
+App structure:
+1. Landing
+2. Node
+3. Settings
