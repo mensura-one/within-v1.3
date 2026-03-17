@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"
-  },
-  "dependencies": {
+},
+"dependencies": {
     "@supabase/supabase-js": "^2.80.0",
     "dayjs": "^1.11.19",
     "next": "^16.1.6",

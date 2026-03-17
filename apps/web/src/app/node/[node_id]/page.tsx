@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
 function getWelcomeSeenStorageKey(nodeId: string) {
   return `welcome_seen:${nodeId}`
@@ -23,10 +24,6 @@ type Signal = {
   endByHour?: string
   createdAt: string
   expiresAt: string
-}
-
-function getSignalsStorageKey(nodeId: string) {
-  return `signals:${nodeId}`
 }
 
 function getNameStorageKey(nodeId: string) {
@@ -114,61 +111,124 @@ export default function NodePage() {
     setShowWelcome(false)
   }
 
-  useEffect(() => {
-    if (!nodeId) return
+  async function loadSignals() {
+  if (!nodeId) return
 
+  const { data, error } = await supabase
+    .from('signals')
+    .select('*')
+    .eq('node_id', nodeId)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error loading signals:', error)
+    return
+  }
+
+  const mappedSignals: Signal[] = (data || []).map((row: any) => {
+    const unitsTotal = row.units_total ?? 0
+
+    return {
+      id: String(row.id),
+      nodeId: row.node_id,
+      postedBy: row.posted_by,
+      heading: row.purpose || '',
+      movementTiming:
+        row.direction === 'later_today' ? 'later_today' : 'now_soon',
+      capacity:
+        unitsTotal <= 2
+          ? 'light'
+          : unitsTotal <= 5
+          ? 'small'
+          : 'open',
+      requestWindow:
+        row.request_window === '30m' ||
+        row.request_window === '1h' ||
+        row.request_window === '2h' ||
+        row.request_window === 'end_by_time'
+          ? row.request_window
+          : '1h',
+      endByHour: row.end_by_hour || undefined,
+      createdAt: row.created_at,
+      expiresAt: row.expires_at,
+    }
+  })
+
+  setSignals(mappedSignals)
+}
+
+  useEffect(() => {
+  if (!nodeId) return
+
+  const savedName = localStorage.getItem(nameStorageKey) || ''
+  setPosterName(savedName)
+
+  const welcomeSeen = localStorage.getItem(getWelcomeSeenStorageKey(nodeId))
+  setShowWelcome(!welcomeSeen)
+
+  loadSignals()
+}, [nodeId, nameStorageKey])
+
+useEffect(() => {
+  if (!nodeId) return
+
+  const interval = setInterval(() => {
     const savedName = localStorage.getItem(nameStorageKey) || ''
     setPosterName(savedName)
+    loadSignals()
+  }, 5000)
 
-    const storedSignals = JSON.parse(
-      localStorage.getItem(getSignalsStorageKey(nodeId)) || '[]'
-    ) as Signal[]
-
-    const welcomeSeen = localStorage.getItem(getWelcomeSeenStorageKey(nodeId))
-    setShowWelcome(!welcomeSeen)
-
-    setSignals(storedSignals)
-  }, [nodeId, nameStorageKey])
+  return () => clearInterval(interval)
+}, [nodeId, nameStorageKey])
 
   useEffect(() => {
     const timer = setInterval(() => setTick((t) => t + 1), 60 * 1000)
     return () => clearInterval(timer)
   }, [])
 
-  function handlePostSignal() {
-    if (!posterName.trim()) {
-      alert('Set your name in Settings first.')
-      return
-    }
-
-    const expiresAt = computeExpiresAt(requestWindow, endByHour)
-
-    const nextSignal: Signal = {
-      id: crypto.randomUUID(),
-      nodeId,
-      postedBy: posterName.trim(),
-      heading: heading.trim(),
-      movementTiming,
-      capacity,
-      requestWindow,
-      endByHour: requestWindow === 'end_by_time' ? endByHour : undefined,
-      createdAt: new Date().toISOString(),
-      expiresAt: expiresAt.toISOString(),
-    }
-
-    const nextSignals = [nextSignal, ...signals]
-    setSignals(nextSignals)
-    localStorage.setItem(
-      getSignalsStorageKey(nodeId),
-      JSON.stringify(nextSignals)
-    )
-
-    setHeading('')
-    setMovementTiming('now_soon')
-    setCapacity('light')
-    setRequestWindow('30m')
-    setEndByHour('6 PM')
+  async function handlePostSignal() {
+  if (!posterName.trim()) {
+    alert('Set your name in Settings first.')
+    return
   }
+
+  const expiresAt = computeExpiresAt(requestWindow, endByHour)
+
+  const unitsTotal =
+    capacity === 'light' ? 2 : capacity === 'small' ? 5 : 10
+
+  const direction =
+    movementTiming === 'later_today' ? 'later_today' : 'now_soon'
+
+  const { error } = await supabase.from('signals').insert({
+    node_id: nodeId,
+    posted_by: posterName.trim(),
+    direction,
+    purpose: heading.trim() || null,
+    request_window: requestWindow,
+    window_start: new Date().toISOString(),
+    window_end: expiresAt.toISOString(),
+    expires_at: expiresAt.toISOString(),
+    end_by_hour: requestWindow === 'end_by_time' ? endByHour : null,
+    units_total: unitsTotal,
+    units_claimed: 0,
+  })
+
+  if (error) {
+    console.error('Error posting signal:', error)
+    alert('Could not post signal.')
+    return
+  }
+
+  setHeading('')
+  setMovementTiming('now_soon')
+  setCapacity('light')
+  setRequestWindow('30m')
+  setEndByHour('6 PM')
+
+  await loadSignals()
+}
 
   const visibleSignals = signals.filter(
     (signal) => new Date(signal.expiresAt).getTime() > Date.now()
@@ -341,14 +401,6 @@ export default function NodePage() {
 
                     <div style={{ marginTop: '0.35rem', color: '#d1d5db' }}>
                       Capacity: {formatCapacity(signal.capacity)}
-                    </div>
-
-                    <div style={{ marginTop: '0.35rem', color: '#d1d5db' }}>
-                      Accept requests until:{' '}
-                      {formatAbsoluteBoundary(
-                        signal.requestWindow,
-                        signal.endByHour
-                      )}
                     </div>
 
                     <div
