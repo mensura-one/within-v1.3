@@ -211,7 +211,7 @@ useEffect(() => {
   const direction =
     movementTiming === 'later_today' ? 'later_today' : 'now_soon'
 
-  const posterid = localStorage.getitem(getPosterIdStorageKey(nodeId)) || posterName.trim()
+  const posterid = localStorage.getItem(getPosterIdStorageKey(nodeId)) || posterName.trim()
   
     const { error } = await supabase.from('signals').insert({
     node_id: nodeId,
