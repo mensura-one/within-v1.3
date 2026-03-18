@@ -26,6 +26,10 @@ type Signal = {
   expiresAt: string
 }
 
+function getPosterIdStorageKey(nodeId: string) {
+  return `poster_id:${nodeId}`
+}
+
 function getNameStorageKey(nodeId: string) {
   return `poster_name:${nodeId}`
 }
@@ -158,6 +162,12 @@ export default function NodePage() {
   setSignals(mappedSignals)
 }
 
+useEffect(() => {
+  if (!nodeId) return
+
+  localStorage.setItem('last_node_id', nodeId)
+}, [nodeId])
+
   useEffect(() => {
   if (!nodeId) return
 
@@ -201,9 +211,11 @@ useEffect(() => {
   const direction =
     movementTiming === 'later_today' ? 'later_today' : 'now_soon'
 
-  const { error } = await supabase.from('signals').insert({
+  const posterid = localStorage.getitem(getPosterIdStorageKey(nodeId)) || posterName.trim()
+  
+    const { error } = await supabase.from('signals').insert({
     node_id: nodeId,
-    posted_by: posterName.trim(),
+    posted_by: posterid,
     direction,
     purpose: heading.trim() || null,
     request_window: requestWindow,

@@ -1,9 +1,18 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function LandingPage() {
   const router = useRouter()
+
+  useEffect(() => {
+    const lastNodeId = localStorage.getItem('last_node_id')
+
+    if (lastNodeId) {
+      router.replace(`/node/${lastNodeId}`)
+    }
+  }, [router])
 
   function handleCreateNode() {
     const nodeId = crypto.randomUUID()
@@ -29,7 +38,6 @@ export default function LandingPage() {
       return
     }
 
-    // fallback: if they only pasted a connection ID, keep it light for now
     alert('Use the full invite link for now.')
   }
 
@@ -125,3 +133,4 @@ export default function LandingPage() {
     </main>
   )
 }
+
