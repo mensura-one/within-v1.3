@@ -106,6 +106,7 @@ export default function SettingsPage() {
     localStorage.removeItem(posterSuffixStorageKey)
     localStorage.removeItem(posterIdStorageKey)
     localStorage.removeItem(getSignalsStorageKey(nodeId))
+    localStorage.removeItem('last_node_id')
 
     const joinedNodes = JSON.parse(
       localStorage.getItem('joined_nodes') || '[]'
