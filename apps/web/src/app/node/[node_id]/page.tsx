@@ -115,6 +115,70 @@ export default function NodePage() {
     setShowWelcome(false)
   }
 
+  // Push notification state
+const [needHelp, setNeedHelp] = useState(false)
+const [isSubscribing, setIsSubscribing] = useState(false)
+
+// Load saved need-help state on mount
+useEffect(() => {
+  const saved = localStorage.getItem(`need_help:${nodeId}`)
+  if (saved === 'true') {
+    setNeedHelp(true)
+  }
+}, [nodeId])
+
+// Register for push (minimal version)
+const registerForPush = async () => {
+  if (!('serviceWorker' in navigator)) {
+    throw new Error('Service workers not supported')
+  }
+  const registration = await navigator.serviceWorker.register('/sw.js')
+  console.log('Service worker registered:', registration)
+}
+
+// Unregister from push
+const unregisterForPush = async () => {
+  const registration = await navigator.serviceWorker.ready
+  await registration.unregister()
+  console.log('Service worker unregistered')
+}
+
+// Toggle need help
+const toggleNeedHelp = async (value: boolean) => {
+  setIsSubscribing(true)
+  
+  try {
+    if (value) {
+      // Turning ON - need permission first
+      if (Notification.permission !== 'granted') {
+        const permission = await Notification.requestPermission()
+        if (permission !== 'granted') {
+          setNeedHelp(false)
+          alert('You need to allow notifications to use this feature')
+          return
+        }
+      }
+      
+      // Permission granted, register service worker
+      await registerForPush()
+      setNeedHelp(true)
+      localStorage.setItem(`need_help:${nodeId}`, 'true')
+      
+    } else {
+      // Turning OFF
+      await unregisterForPush()
+      setNeedHelp(false)
+      localStorage.removeItem(`need_help:${nodeId}`)
+    }
+  } catch (err) {
+    console.error('Failed to toggle:', err)
+    alert('Something went wrong')
+    setNeedHelp(false)
+  } finally {
+    setIsSubscribing(false)
+  }
+}
+
   async function loadSignals() {
   if (!nodeId) return
 
@@ -345,6 +409,47 @@ useEffect(() => {
             </button>
           </section>
         )}
+
+        {/* Need Help Switch */}
+<section
+  style={{
+    background: '#1f2937',
+    borderRadius: '16px',
+    padding: '1.25rem',
+  }}
+>
+  <label
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.75rem',
+      cursor: isSubscribing ? 'not-allowed' : 'pointer',
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={needHelp}
+      onChange={(e) => toggleNeedHelp(e.target.checked)}
+      disabled={isSubscribing}
+      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+    />
+    <span style={{ fontWeight: 600 }}>
+      {isSubscribing ? 'Setting up...' : 'Notify me when new signals are posted'}
+    </span>
+  </label>
+  {needHelp && !isSubscribing && (
+    <p
+      style={{
+        fontSize: '0.8rem',
+        color: '#9ca3af',
+        marginTop: '0.75rem',
+        marginBottom: 0,
+      }}
+    >
+      🔔 Notifications enabled.
+    </p>
+  )}
+</section>
 
         <section
           style={{
